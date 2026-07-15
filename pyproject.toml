@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lucy-code"
+version = "1.0.0"
+description = "Terminal-native AI coding copilot"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "openai",
+    "strands-agents",
+    "rich",
+    "prompt-toolkit",
+    "platformdirs",
+]
+
+[project.scripts]
+lucy = "lucy.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lucy*"]
+
+[tool.setuptools.package-data]
+lucy = [
+    "agent/prompts/*.md",
+    "agent/skills/**",
+]
