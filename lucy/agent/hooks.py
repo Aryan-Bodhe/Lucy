@@ -4,7 +4,7 @@ from strands.hooks import (
     BeforeToolCallEvent, 
     AfterToolCallEvent
 )
-from lucy.ui.renderer import ui
+from lucy.ui.core import ui
 from lucy.agent.utils import parse_tool_parameters
 from lucy.logger import get_logger
 
@@ -26,7 +26,7 @@ class ProgressHook(HookProvider):
             event.tool_use["input"]
         )
         tool_type = "skill" if tool_name == "skills" else "tool"
-        ui.render_tool_status(
+        ui.tools.render_status(
             tool_name if tool_type == "tool" else tool_command,
             tool_command=tool_command,
             tool_type=tool_type,
@@ -68,7 +68,7 @@ class ProgressHook(HookProvider):
             tool_name,
             tool_command
         )
-        ui.render_tool_status(
+        ui.tools.render_status(
             tool_name if tool_type == "tool" else tool_command,
             tool_command=tool_command,
             tool_type=tool_type,
