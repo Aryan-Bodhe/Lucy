@@ -1,3 +1,9 @@
+import os
+
+# Set necessary environment vars before any imports
+os.environ.setdefault("BYPASS_TOOL_CONSENT", "true")
+os.environ.setdefault("EDITOR_DISABLE_BACKUP", "true")
+
 import argparse
 from lucy.logger import get_logger
 from lucy.ui.renderer import ui
