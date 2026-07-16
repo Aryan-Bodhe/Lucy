@@ -26,7 +26,7 @@ Lucy combines an LLM with local tools, live progress updates, and explicit user 
 ### Option 1 — Install directly from GitHub
 
 ```bash
-pip install git+https://github.com/aryan-bodhe/lucy.git
+pipx install git+https://github.com/aryan-bodhe/lucy.git
 ```
 
 ### Option 2 — Clone the repository
@@ -61,12 +61,6 @@ Start an interactive session:
 lucy
 ```
 
-Login with your OpenAI API key:
-
-```bash
-lucy login
-```
-
 Logout and remove your stored credentials:
 
 ```bash
@@ -89,7 +83,7 @@ lucy --version
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.12+
 - OpenAI API Key
 
 ---
