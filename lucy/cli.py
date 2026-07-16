@@ -1,6 +1,12 @@
+import os
+
+# Set necessary environment vars before any imports
+os.environ.setdefault("BYPASS_TOOL_CONSENT", "true")
+os.environ.setdefault("EDITOR_DISABLE_BACKUP", "true")
+
 import argparse
 from lucy.logger import get_logger
-from lucy.ui.renderer import ui
+from lucy.ui.core import ui
 from lucy.app import run_app
 from lucy.config import VERSION
 
@@ -41,10 +47,10 @@ def main():
     try:
         match args.command:
             case "login":
-                ui.render_login_flow()
+                ui.auth.render_login_flow()
 
             case "logout":
-                ui.render_logout_flow()
+                ui.auth.render_logout_flow()
 
             case "doctor":
                 return
@@ -53,7 +59,7 @@ def main():
             case _:
                 run_app()
     except Exception:
-        ui.render_error("An unexpected error occurred. Please retry.")
+        ui.responses.render_error("An unexpected error occurred. Please retry.")
         logger.exception("Unexpected error occurred")
 
     except KeyboardInterrupt:

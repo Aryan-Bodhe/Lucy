@@ -12,8 +12,6 @@ from lucy.agent.interventions import SensitiveToolApproval
 from lucy.agent.prompts.system_prompt import PROMPT
 from lucy.agent.utils import get_prompt_metadata
 
-from lucy.ui.renderer import ui
-
 from lucy.logger import get_logger
 from lucy.config import MODEL, SKILLS_DIR, APP_NAME, MODEL_PROVIDER
 

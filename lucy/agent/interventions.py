@@ -8,7 +8,7 @@ from strands.interventions import (
 from lucy.agent.tools import SENSITIVE_TOOLS
 from lucy.agent.utils import parse_tool_parameters
 
-from lucy.ui.renderer import ui
+from lucy.ui.core import ui
 
 from lucy.logger import get_logger
 
@@ -22,7 +22,7 @@ class SensitiveToolApproval(InterventionHandler):
         if tool_name in SENSITIVE_TOOLS:
             command = parse_tool_parameters(tool_name, event.tool_use['input'])
             logger.info(f"Requested user approval for tool: [{tool_name}] {command}")
-            response = ui.render_approval(tool_name, command)
+            response = ui.approvals.render_approval(tool_name, command)
             return Confirm(response=response)
         return Proceed()
     
@@ -85,7 +85,7 @@ class SudoPasswordHandler(InterventionHandler):
             if "permission denied" in lines.get("text").lower():
                 tool_name = event.tool_use["name"]
                 command = parse_tool_parameters(tool_name, event.tool_use['input'])
-                password = ui.render_sudo_permission_request(tool_name, command)
+                password = ui.approvals.render_sudo_permission_request(tool_name, command)
                 
                 if self._gain_sudo_privileges(password):
                     return Proceed("User has granted sudo permissions. Retry the earlier failed commands with sudo.")
