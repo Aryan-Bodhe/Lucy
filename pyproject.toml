@@ -7,14 +7,18 @@ name = "lucy-code"
 version = "1.0.0"
 description = "Terminal-native AI coding copilot"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 
 dependencies = [
-    "openai",
-    "strands-agents",
-    "rich",
-    "prompt-toolkit",
-    "platformdirs",
+    "openai~=2.45",
+    "strands-agents~=1.47",
+    "strands-agents-tools~=0.8",
+    "pyfiglet~=1.0",
+    "keyring~=25.7",
+    "colorama~=0.4",
+    "rich~=14.3",
+    "prompt-toolkit~=3.0",
+    "platformdirs~=4.10",
 ]
 
 [project.scripts]
