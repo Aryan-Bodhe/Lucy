@@ -42,7 +42,7 @@ class RequestSession:
         self._console.print(*args, **kwargs)
 
 
-def _get_request_stats_title(self, session: RequestSession):
+def _get_request_stats_title(session: RequestSession):
         if session.usage:
             input = session.usage.get("inputTokens", 0)
             output = session.usage.get("outputTokens", 0)
