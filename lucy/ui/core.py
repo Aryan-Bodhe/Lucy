@@ -1,7 +1,6 @@
 import os
 import time
 from contextlib import contextmanager
-from getpass import getpass
 
 from rich.console import Console
 
@@ -12,6 +11,7 @@ from lucy.ui.constants import *
 from lucy.ui.approvals import ApprovalUI
 from lucy.ui.auth import AuthUI
 from lucy.ui.banner import BannerUI
+from lucy.ui.doctor import DoctorUI
 from lucy.ui.responses import ResponseUI
 from lucy.ui.tools import ToolUI
 
@@ -70,6 +70,7 @@ class _UI:
         self.responses = ResponseUI(self.console)
         self.tools = ToolUI(self.console)
         
+        self.doctor = DoctorUI(self.console)
     
     def initialise(self):
         os.system("clear")
