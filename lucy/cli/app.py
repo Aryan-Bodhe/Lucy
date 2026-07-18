@@ -9,7 +9,7 @@ from openai import (
 )
 
 from lucy.agent.agent import run_agent
-from lucy.context import token_manager
+from lucy.cli.context import session_manager, token_manager
 from lucy.logger import get_logger
 from lucy.ui.core import ui
 from lucy.config import CLEAR_TERMINAL_UPON_EXIT
@@ -50,17 +50,18 @@ def run_app():
     ui.initialise()
     ui.banner.render()
 
-    while True:
-        with ui.render_request_lifecycle() as session:
-            try:
-                prompt = session.input()
-            except KeyboardInterrupt:
-                ui.terminate(CLEAR_TERMINAL_UPON_EXIT)
-                raise
+    with session_manager():
+        while True:
+            with ui.render_request_lifecycle() as request:
+                try:
+                    prompt = request.input()
+                except KeyboardInterrupt:
+                    ui.terminate(CLEAR_TERMINAL_UPON_EXIT)
+                    raise
 
-            response = handle_request(prompt)
-            if response is not None:
-                session.usage = response.usage
-                session.time_elapsed = response.time
-                session.print()
-                ui.responses.render_response(response.content)
+                response = handle_request(prompt)
+                if response is not None:
+                    request.usage = response.usage
+                    request.time_elapsed = response.time
+                    request.print()
+                    ui.responses.render_response(response.content)
