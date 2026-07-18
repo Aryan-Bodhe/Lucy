@@ -7,12 +7,12 @@ os.environ.setdefault("EDITOR_DISABLE_BACKUP", "true")
 import argparse
 from lucy.logger import get_logger
 from lucy.ui.core import ui
-from lucy.app import run_app
+from lucy.cli.dispatcher import dispatch_command, SUBCOMMANDS
 from lucy.config import VERSION
 
 logger = get_logger()
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(
         prog="lucy",
         description="Lucy — Your AI coding copilot.",
@@ -27,40 +27,20 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser(
-        "login",
-        help="Store your OpenAI API key",
-    )
-
-    subparsers.add_parser(
-        "logout",
-        help="Remove your stored API key",
-    )
-
-    subparsers.add_parser(
-        "doctor",
-        help="Diagnose your Lucy installation (coming soon)",
-    )
+    for command, helptext in SUBCOMMANDS.items():
+        subparsers.add_parser(name=command, help=helptext)
 
     args = parser.parse_args()
+    return args
 
+def main():
     try:
-        match args.command:
-            case "login":
-                ui.auth.render_login_flow()
-
-            case "logout":
-                ui.auth.render_logout_flow()
-
-            case "doctor":
-                return
-                ui.render_doctor()
-
-            case _:
-                run_app()
-    except Exception:
-        ui.responses.render_error("An unexpected error occurred. Please retry.")
-        logger.exception("Unexpected error occurred")
+        args = parse_args()
+        dispatch_command(args)
 
     except KeyboardInterrupt:
         logger.info("User exited application")
+
+    except Exception:
+        ui.responses.render_error("An unexpected error occurred. Please retry.")
+        logger.exception("Unexpected error occurred")

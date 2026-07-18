@@ -4,6 +4,8 @@ SDOT = "●"
 HDOT = "○"
 TICK = "✔"
 CROSS = "✘"
+CAUTION = "!"
+MISSING = "?"
 
 WELCOME_TEXT = f"Welcome to {AGENT_NAME}, your personal AI coding copilot!"
 
