@@ -14,6 +14,7 @@ from lucy.ui.auth import AuthUI
 from lucy.ui.banner import BannerUI
 from lucy.ui.responses import ResponseUI
 from lucy.ui.tools import ToolUI
+from lucy.ui.doctor import DoctorUI
 
 from lucy.logger import get_logger
 
@@ -69,6 +70,8 @@ class _UI:
         self.banner = BannerUI(self.console)
         self.responses = ResponseUI(self.console)
         self.tools = ToolUI(self.console)
+
+        self.doctor = DoctorUI(self.console)
         
     
     def initialise(self):

@@ -8,12 +8,6 @@ from lucy.logger import get_logger
 
 logger = get_logger()
 
-def get_configured_providers():
-    return [
-        provider
-        for provider in SUPPORTED_PROVIDERS
-        if get_api_key(provider) is not None
-    ]
 
 def get_api_key(provider: str):
     return keyring.get_password(APP_NAME, provider)

@@ -47,16 +47,18 @@ def handle_request(prompt: str) -> AgentResponse:
 
 def run_app():
     logger.info("Initialized Strands Coder Agent")
-    ui.initialise()
-    ui.banner.render()
-
     with session_manager():
+        logger.info("Created new session")
+        ui.initialise()
+        ui.banner.render()
+
         while True:
             with ui.render_request_lifecycle() as request:
                 try:
                     prompt = request.input()
                 except KeyboardInterrupt:
                     ui.terminate(CLEAR_TERMINAL_UPON_EXIT)
+                    logger.info("Terminating session")
                     raise
 
                 response = handle_request(prompt)
