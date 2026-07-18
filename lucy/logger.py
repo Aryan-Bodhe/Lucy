@@ -3,7 +3,7 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 from colorama import Fore, Style, init as colorama_init
 
-from lucy.context import request_id_var
+from lucy.cli.context import session_id_var, request_id_var
 
 try:
     from lucy.config import LOGGING_DIR, LOGGING_LIMIT_DAYS, LOG_TO_CONSOLE
@@ -19,7 +19,7 @@ LOG_FILENAME = os.path.join(LOGGING_DIR, "app.log")
 
 LOG_FORMAT = (
     "%(asctime)s | %(levelname)-8s | "
-    "req_id=%(request_id)s | %(message)s"
+    "session_id=%(session_id)s | req_id=%(request_id)s | %(message)s"
 )
 
 COLOR_FORMATS = {
@@ -30,6 +30,10 @@ COLOR_FORMATS = {
     "CRITICAL": Fore.RED + Style.BRIGHT + LOG_FORMAT + Style.RESET_ALL,
 }
 
+class SessionIdFilter(logging.Filter):
+    def filter(self, record):
+        record.session_id = session_id_var.get()
+        return True
 
 class RequestIdFilter(logging.Filter):
     def filter(self, record):
@@ -49,12 +53,14 @@ def get_logger(name: str = "app", level = logging.INFO, console: bool = LOG_TO_C
     logger.propagate = False
 
     if not logger.handlers:
+        session_filter = SessionIdFilter()
         request_filter = RequestIdFilter()
 
         # Console
         if console:
             ch = logging.StreamHandler()
             ch.setLevel(level)
+            ch.addFilter(session_filter)
             ch.addFilter(request_filter)
             ch.setFormatter(ColoredFormatter())
             logger.addHandler(ch)
@@ -70,6 +76,7 @@ def get_logger(name: str = "app", level = logging.INFO, console: bool = LOG_TO_C
         )
 
         fh.setLevel(level)
+        fh.addFilter(session_filter)
         fh.addFilter(request_filter)
         fh.setFormatter(
             logging.Formatter(
