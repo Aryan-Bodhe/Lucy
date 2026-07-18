@@ -18,6 +18,9 @@ STATE_DIR.mkdir(parents=True, exist_ok=True)
 AGENT_NAME = "Lucy"
 AGENT_PROMPT_HISTORY_FILE = str(STATE_DIR / "history.txt")
 CLEAR_TERMINAL_UPON_EXIT = False
+SUPPORTED_PROVIDERS = [
+    ("openai", "gpt-5.4-mini")
+]
 
 # Model parameters
 MODEL = "gpt-5.4-mini"
