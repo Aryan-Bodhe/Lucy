@@ -44,4 +44,3 @@ def main():
     except Exception:
         ui.responses.render_error("An unexpected error occurred. Please retry.")
         logger.exception("Unexpected error occurred")
-main()
