@@ -13,6 +13,8 @@ SKILLS_DIR = PACKAGE_DIR / "agent" / "skills"
 STATE_DIR = Path(user_state_dir(APP_NAME, APP_AUTHOR))
 LOGGING_DIR = Path(user_state_dir(APP_NAME, APP_AUTHOR)) / "logs"
 STATE_DIR.mkdir(parents=True, exist_ok=True)
+SESSIONS_DIR = Path(user_state_dir(APP_NAME, APP_AUTHOR)) / "sessions"
+SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Agent configuration
 AGENT_NAME = "Lucy"
