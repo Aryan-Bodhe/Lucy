@@ -55,7 +55,7 @@ class DummyContext:
         return DummyLifecycle(self.request)
 
 
-class SessionManager:
+class DummyScope:
     def __init__(self):
         self.entered = False
         self.exited = False
@@ -67,3 +67,15 @@ class SessionManager:
     def __exit__(self, exc_type, exc, tb):
         self.exited = True
         return False
+
+
+class SessionManager:
+    def __init__(self):
+        self.session_ctx = DummyScope()
+        self.request_ctx = DummyScope()
+
+    def session_scope(self):
+        return self.session_ctx
+
+    def request_scope(self):
+        return self.request_ctx

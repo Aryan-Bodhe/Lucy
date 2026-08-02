@@ -12,7 +12,7 @@ from lucy.ui.core import ui
 
 from lucy.logger import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 class SensitiveToolApproval(InterventionHandler):
     name = "sensitive-tool-approval"

@@ -15,7 +15,7 @@ from lucy.config import (
     MODEL
 )
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 class BannerUI:
     def __init__(self, console: Console):

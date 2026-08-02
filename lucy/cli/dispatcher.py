@@ -7,6 +7,7 @@ SUBCOMMANDS = {
     "login" :   "Login with an API key",
     "logout":   "Remove your stored API key",
     "doctor":   "Diagnose your installation",
+    "sessions": "View and resume past sessions",
     "usage" :   "Get usage statistics (coming soon)"
 }
 
@@ -20,6 +21,9 @@ def dispatch_command(args: Namespace):
 
         case "doctor":
             ui.doctor.render_doctor_flow()
+
+        case "sessions":
+            ui.session.render_sessions_flow()
 
         case _:
             run_app()

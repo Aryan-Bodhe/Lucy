@@ -7,7 +7,7 @@ from lucy.ui.constants import *
 
 from lucy.logger import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 class ToolUI:

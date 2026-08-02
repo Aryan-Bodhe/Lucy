@@ -1,9 +1,8 @@
 from types import SimpleNamespace
 
 import pytest
-
+from unittest.mock import Mock
 from lucy.cli import app
-
 from ._helpers import DummyContext, DummyRequest, SessionManager
 
 
@@ -16,33 +15,19 @@ def test_handle_request_success(monkeypatch):
             {"content": [{"text": "hello world"}], "metadata": {"usage": {"inputTokens": 1}}},
             1.25,
         )
-
-    token_calls = []
-
-    class TokenCtx:
-        def __enter__(self):
-            token_calls.append("enter")
-
-        def __exit__(self, exc_type, exc, tb):
-            token_calls.append("exit")
-            return False
-
+   
     monkeypatch.setattr(app, "run_agent", fake_run_agent)
-    monkeypatch.setattr(app, "token_manager", lambda: TokenCtx())
-
     result = app.handle_request("prompt text")
 
     assert captured["prompt"] == "prompt text"
-    assert token_calls == ["enter", "exit"]
     assert result.content == "hello world"
     assert result.usage == {"inputTokens": 1}
     assert result.time == 1.25
 
 
-from unittest.mock import Mock
 
 @pytest.mark.parametrize(
-    "exc,message",
+    "exc, message",
     [
         (
             app.NotFoundError(
@@ -66,7 +51,11 @@ from unittest.mock import Mock
             ),
             "Unable to connect to servers. Please check your internet connection and try again.",
         ),
-        # ...
+    ],
+    ids=[
+        "model_not_found",
+        "insufficient_credits",
+        "connection_error",
     ],
 )
 def test_handle_request_renders_expected_errors(monkeypatch, exc, message):
@@ -95,7 +84,7 @@ def test_run_app_happy_path(monkeypatch):
     responses = []
 
     monkeypatch.setattr(app, "ui", ctx)
-    monkeypatch.setattr(app, "session_manager", lambda: session_mgr)
+    monkeypatch.setattr(app, "SessionManager", lambda: session_mgr)
     monkeypatch.setattr(app, "handle_request", lambda prompt: SimpleNamespace(content="response", usage={"u": 1}, time=2.5))
     monkeypatch.setattr(app, "CLEAR_TERMINAL_UPON_EXIT", False)
 
@@ -110,8 +99,11 @@ def test_run_app_happy_path(monkeypatch):
 
     assert ctx.initialise_called is True
     assert ctx.banner_render_called is True
-    assert session_mgr.entered is True
     assert ctx.request.usage == {"u": 1}
     assert ctx.request.time_elapsed == 2.5
     assert ctx.request.print_called is True
     assert responses == ["response"]
+    assert session_mgr.session_ctx.entered is True
+    assert session_mgr.session_ctx.exited is True
+    assert session_mgr.request_ctx.entered is True
+    assert session_mgr.request_ctx.exited is True

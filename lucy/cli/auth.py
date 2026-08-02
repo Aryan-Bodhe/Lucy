@@ -6,7 +6,7 @@ from openai import AuthenticationError
 from lucy.config import APP_NAME, MODEL, SUPPORTED_PROVIDERS
 from lucy.logger import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 def get_api_key(provider: str):

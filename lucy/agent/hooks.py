@@ -8,7 +8,7 @@ from lucy.ui.core import ui
 from lucy.agent.utils import parse_tool_parameters
 from lucy.logger import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 class ProgressHook(HookProvider):
