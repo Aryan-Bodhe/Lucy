@@ -8,7 +8,7 @@ from lucy.ui.constants import *
 
 from lucy.logger import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 def _check_approval(s: str):
     return s.strip().lower() in {"", "y", "yes", "ok"}

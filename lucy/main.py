@@ -10,7 +10,7 @@ from lucy.ui.core import ui
 from lucy.cli.dispatcher import dispatch_command, SUBCOMMANDS
 from lucy.config import VERSION
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser(

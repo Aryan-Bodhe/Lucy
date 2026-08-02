@@ -1,151 +1,87 @@
-import json
-from datetime import UTC, datetime
-from uuid import uuid4
+from pathlib import Path
 
 import pytest
 
-from lucy.session.models import (
-    ExecutionMetrics,
-    SessionMetadata,
-    TranscriptEvent,
-    UsageMetrics,
-)
-from lucy.session.store import SessionStore
+from lucy.session.models import SessionData, SessionTranscript, TranscriptEvent
 
 
-@pytest.fixture
-def store(tmp_path):
-    session_id = uuid4()
+def test_initialise_creates_directory_and_files(sessions_dir, session_id):
+    from lucy.session.store import SessionStore
 
-    session_dir = tmp_path / str(session_id)
-    session_dir.mkdir()
+    store = SessionStore(session_id)
+    returned = store.initialise()
 
-    metadata_file = session_dir / "metadata.json"
-    transcript_file = session_dir / "transcript.jsonl"
-
-    metadata = SessionMetadata()
-
-    metadata_file.write_text(
-        metadata.model_dump_json(indent=2),
-        encoding="utf-8",
-    )
-
-    transcript_file.touch()
-
-    return SessionStore(
-        session_id=session_id,
-        session_dir=session_dir,
-        metadata_file=metadata_file,
-        transcript_file=transcript_file,
-    )
+    assert returned is store
+    assert store.path.exists()
+    assert store.path.is_dir()
+    assert store.metadata_file.exists()
+    assert store.transcript_file.exists()
 
 
-def test_append_transcript(store):
-    event = TranscriptEvent(
-        timestamp=datetime.now(UTC),
-        role="user",
-        message="hello",
-    )
+def test_update_metadata_writes_json_and_read_metadata_round_trips(
+    sessions_dir, session_id, sample_metadata
+):
+    from lucy.session.store import SessionStore
 
-    store.append_transcript(event)
+    store = SessionStore(session_id).initialise()
+    store.update_metadata(sample_metadata)
 
-    lines = store.transcript_file.read_text(encoding="utf-8").splitlines()
-
-    assert len(lines) == 1
-
-    loaded = TranscriptEvent.model_validate_json(lines[0])
-
-    assert loaded == event
+    loaded = store.read_metadata()
+    assert loaded == sample_metadata
+    assert loaded.model_dump() == sample_metadata.model_dump()
 
 
-def test_update_metadata(store):
-    metadata = SessionMetadata(
-        usage=UsageMetrics(input_tokens=123),
-        execution=ExecutionMetrics(model_calls=5),
-    )
+def test_append_transcript_appends_jsonl_lines(sessions_dir, session_id, sample_event):
+    from lucy.session.store import SessionStore
 
-    store.update_metadata(metadata)
+    store = SessionStore(session_id).initialise()
 
-    loaded = SessionMetadata.model_validate_json(
-        store.metadata_file.read_text(encoding="utf-8")
-    )
+    second_event = sample_event.model_copy(update={"message": "second"})
+    store.append_transcript(sample_event)
+    store.append_transcript(second_event)
 
-    assert loaded == metadata
-
-
-def test_load(store):
-    event = TranscriptEvent(
-        timestamp=datetime.now(UTC),
-        role="lucy",
-        message="hi",
-    )
-
-    store.append_transcript(event)
-
-    expected_metadata = SessionMetadata.model_validate_json(
-        store.metadata_file.read_text(encoding="utf-8")
-    )
-
-    data = store.load()
-
-    assert data.session_id == store.session_id
-    assert data.metadata == expected_metadata
-    assert data.transcript == [event]
+    text = store.transcript_file.read_text(encoding="utf-8").splitlines()
+    assert len(text) == 2
+    assert '"message":"hello"' in text[0] or '"message": "hello"' in text[0]
+    assert '"message":"second"' in text[1] or '"message": "second"' in text[1]
 
 
-def test_validate_success(store):
-    store.validate()
+def test_read_transcript_data_round_trips_multiple_events(sessions_dir, session_id, sample_event):
+    from lucy.session.store import SessionStore
+
+    store = SessionStore(session_id).initialise()
+    second_event = sample_event.model_copy(update={"message": "second"})
+    store.append_transcript(sample_event)
+    store.append_transcript(second_event)
+
+    transcript = store.read_transcript_data()
+
+    assert isinstance(transcript, SessionTranscript)
+    assert transcript.events == [sample_event, second_event]
 
 
-def test_validate_missing_metadata(store):
-    store.metadata_file.unlink()
+def test_read_session_data_combines_metadata_and_transcript(
+    sessions_dir, session_id, sample_metadata, sample_event
+):
+    from lucy.session.store import SessionStore
 
+    store = SessionStore(session_id).initialise()
+    store.update_metadata(sample_metadata)
+    store.append_transcript(sample_event)
+
+    session_data = store.read_session_data()
+
+    assert isinstance(session_data, SessionData)
+    assert session_data.session_id == session_id
+    assert session_data.metadata == sample_metadata
+    assert session_data.transcript.events == [sample_event]
+
+
+def test_read_metadata_on_missing_file_raises(tmp_path, monkeypatch, session_id):
+    from lucy.session import store as store_module
+    from lucy.session.store import SessionStore
+
+    monkeypatch.setattr(store_module, "SESSIONS_DIR", tmp_path / "sessions")
+    store = SessionStore(session_id)
     with pytest.raises(FileNotFoundError):
-        store.validate()
-
-
-def test_validate_missing_transcript(store):
-    store.transcript_file.unlink()
-
-    with pytest.raises(FileNotFoundError):
-        store.validate()
-
-
-def test_validate_invalid_metadata_json(store):
-    store.metadata_file.write_text(
-        "{invalid json",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError):
-        store.validate()
-
-
-def test_validate_invalid_metadata_schema(store):
-    store.metadata_file.write_text(
-        json.dumps({"foo": "bar"}),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError):
-        store.validate()
-
-
-def test_validate_invalid_transcript_json(store):
-    store.transcript_file.write_text(
-        "{bad json}\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError):
-        store.validate()
-
-
-def test_validate_invalid_transcript_schema(store):
-    store.transcript_file.write_text(
-        json.dumps({"foo": "bar"}) + "\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError):
-        store.validate()
+        store.read_metadata()

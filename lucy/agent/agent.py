@@ -15,7 +15,7 @@ from lucy.agent.utils import get_prompt_metadata
 from lucy.logger import get_logger
 from lucy.config import MODEL, SKILLS_DIR, APP_NAME, MODEL_PROVIDER
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 _agent = None
 _tools = ALL_TOOLS
@@ -78,4 +78,4 @@ def run_agent(prompt: str):
         getattr(usage, "cacheWriteInputTokens", 0),
         elapsed,
     )
-    return response.message, elapsed
+    return response, elapsed

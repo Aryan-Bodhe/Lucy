@@ -7,7 +7,7 @@ from lucy.logger import get_logger
 
 from lucy.config import AGENT_NAME
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 class ResponseUI:

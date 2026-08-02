@@ -7,7 +7,7 @@ from strands_tools import (
 )
 from lucy.logger import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 SENSITIVE_TOOLS = [

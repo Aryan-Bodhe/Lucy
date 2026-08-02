@@ -3,7 +3,7 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 from colorama import Fore, Style, init as colorama_init
 
-from lucy.cli.context import session_id_var, request_id_var
+from lucy.session.vars import session_id_var, request_id_var
 
 try:
     from lucy.config import LOGGING_DIR, LOGGING_LIMIT_DAYS, LOG_TO_CONSOLE
@@ -19,7 +19,7 @@ LOG_FILENAME = os.path.join(LOGGING_DIR, "app.log")
 
 LOG_FORMAT = (
     "%(asctime)s | %(levelname)-8s | "
-    "session_id=%(session_id)s | req_id=%(request_id)s | %(message)s"
+    "session_id=%(session_id)s | req_id=%(request_id)s | [%(name)-15s] %(message)s"
 )
 
 COLOR_FORMATS = {
@@ -47,7 +47,7 @@ class ColoredFormatter(logging.Formatter):
         return logging.Formatter(fmt, "%Y-%m-%d %H:%M:%S").format(record)
 
 
-def get_logger(name: str = "app", level = logging.INFO, console: bool = LOG_TO_CONSOLE) -> logging.Logger:
+def get_logger(name: str, level = logging.INFO, console: bool = LOG_TO_CONSOLE) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.propagate = False

@@ -1,75 +1,77 @@
+from datetime import UTC, datetime
 import json
-from pathlib import Path
-from pydantic import ValidationError
 from uuid import UUID
 
-from lucy.session.models import SessionMetadata, SessionData, TranscriptEvent
+from lucy.config import SESSIONS_DIR
+from lucy.session.models import SessionData, SessionMetadata, SessionTranscript, TranscriptEvent
+from lucy.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class SessionStore:
-    def __init__(
-        self, 
-        session_id: UUID, 
-        session_dir: Path, 
-        metadata_file: Path,
-        transcript_file: Path
-    ):
+    def __init__(self, session_id: UUID):
         self.session_id = session_id
-        self.session_dir = session_dir
-        self.metadata_file = metadata_file
-        self.transcript_file = transcript_file
+        self.path = SESSIONS_DIR / f"{session_id}"
+        self.metadata_file = self.path / "metadata.json"
+        self.transcript_file = self.path / "transcript.jsonl"
+        
+
+    def initialise(self):
+        self.path.mkdir(exist_ok=True, parents=True)
+        self.metadata_file.touch(exist_ok=True)
+        self.update_metadata(
+            SessionMetadata(started_at=datetime.now(UTC))
+        )
+
+        self.transcript_file.touch(exist_ok=True)
+        self.append_transcript(
+            TranscriptEvent(
+                role="agent", 
+                message="Transcription started."
+            )
+        )
+        logger.info("[store.py] Store init successful.")
+        return self
 
 
-    def load(self):
-        with self.metadata_file.open("r", encoding="utf-8") as f:
-            metadata_dict = json.load(f)
+    def update_metadata(self, new_metadata: SessionMetadata):
+        data = new_metadata.model_dump_json(indent=2)
+        self.metadata_file.write_text(data, encoding="utf-8")
+        logger.info("[store.py] Metadata updated")
 
-        metadata = SessionMetadata.model_validate(metadata_dict)
-        with self.transcript_file.open("r", encoding="utf-8") as f:
-            transcript = [
-                TranscriptEvent.model_validate_json(line)
-                for line in f
-            ]
 
+    def append_transcript(self, transcript_event: TranscriptEvent):
+        data = transcript_event.model_dump_json()
+        with self.transcript_file.open("a") as f:
+            f.write(data)
+            f.write("\n")
+        logger.info("Transcript event appended.")
+
+    def read_metadata(self):
+        m = self.metadata_file.read_text(encoding="utf-8")
+        m_j = json.loads(m)
+        metadata = SessionMetadata.model_validate(m_j)
+        return metadata
+
+    def read_transcript_data(self):
+        events = [
+            TranscriptEvent.model_validate_json(line)
+            for line in self.transcript_file.read_text().splitlines()
+        ]
+        transcript = SessionTranscript(events=events)
+        return transcript
+
+    def read_session_data(self):
+        metadata = self.read_metadata()
+        transcript = self.read_transcript_data()
         return SessionData(
-            session_id=self.session_id, 
-            metadata=metadata, 
+            session_id=self.session_id,
+            metadata=metadata,
             transcript=transcript
         )
 
-
-    def append_transcript(self, event: TranscriptEvent) -> None:
-        with self.transcript_file.open("a", encoding="utf-8") as f:
-            f.write(f"{event.model_dump_json()}\n")
-
-
-    def update_metadata(self, metadata: SessionMetadata):
-        self.metadata_file.write_text(
-            metadata.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-
-
-    def validate(self) -> None:
-        if not (
-            self.metadata_file.exists()
-            and self.transcript_file.exists()
-        ):
-            raise FileNotFoundError(
-                f"Session {self.session_id} is corrupted."
-            )
-
-        try:
-            with self.metadata_file.open("r", encoding="utf-8") as f:
-                metadata = json.load(f)
-
-            SessionMetadata.model_validate(metadata)
-
-            with self.transcript_file.open("r", encoding="utf-8") as f:
-                for line in f:
-                    TranscriptEvent.model_validate_json(line)
-
-        except (json.JSONDecodeError, ValidationError) as e:
-            raise ValueError(
-                f"Session {self.session_id} contains invalid data."
-            ) from e
+    def close(self):
+        metadata = self.read_metadata()
+        metadata.ended_at = datetime.now(UTC)
+        self.update_metadata(metadata)
