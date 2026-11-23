@@ -26,7 +26,7 @@ class SessionRepository:
         sessions: list[SessionSummary] = []
         i = 0
         for dir in self.path.iterdir():
-            if i > self.ITERDIR_HARD_LIMIT:
+            if i >= self.ITERDIR_HARD_LIMIT:
                 break
             i += 1
             sessions.append(self._get_session_summary(dir))

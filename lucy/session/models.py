@@ -29,7 +29,7 @@ class UsageMetrics(BaseModel):
         )
 
 class TranscriptEvent(BaseModel):
-    timestamp: datetime = Field(default_factory=lambda x: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     role: Literal["user", "agent"]
     message: str
 

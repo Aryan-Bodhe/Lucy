@@ -1,109 +1,142 @@
-from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
-from unittest.mock import Mock
+
 from lucy.cli import app
-from ._helpers import DummyContext, DummyRequest, SessionManager
+from ._helpers import FakeSessionManager, FakeUI, fake_agent_result
 
 
-def test_handle_request_success(monkeypatch):
+@pytest.fixture()
+def fake_ui(monkeypatch):
+    ui = FakeUI()
+    monkeypatch.setattr(app, "ui", ui)
+    return ui
+
+
+# ---------- _handle_request ----------
+
+def test_handle_request_helper_returns_answer_usage_and_time(monkeypatch, fake_ui):
     captured = {}
 
     def fake_run_agent(prompt):
         captured["prompt"] = prompt
-        return (
-            {"content": [{"text": "hello world"}], "metadata": {"usage": {"inputTokens": 1}}},
-            1.25,
-        )
-   
+        return fake_agent_result(text="hello world"), 1.25
+
     monkeypatch.setattr(app, "run_agent", fake_run_agent)
-    result = app.handle_request("prompt text")
+
+    result = app._handle_request("prompt text")
 
     assert captured["prompt"] == "prompt text"
     assert result.content == "hello world"
-    assert result.usage == {"inputTokens": 1}
+    assert result.usage.input_tokens == 1_000
     assert result.time == 1.25
-
 
 
 @pytest.mark.parametrize(
     "exc, message",
     [
         (
-            app.NotFoundError(
-                "not found",
-                response=Mock(),
-                body={},
-            ),
+            app.NotFoundError("not found", response=Mock(), body={}),
             "Selected model is not available. Please check model ID and try again.",
         ),
         (
-            app.RateLimitError(
-                "rate limit",
-                response=Mock(),
-                body={},
-            ),
+            app.RateLimitError("rate limit", response=Mock(), body={}),
             "You have exhausted your token credits for selected model. Please check your API balance and try again.",
         ),
         (
-            app.APIConnectionError(
-                request=Mock(),
-            ),
+            app.APIConnectionError(request=Mock()),
             "Unable to connect to servers. Please check your internet connection and try again.",
         ),
+        (
+            app.AuthenticationError("bad key", response=Mock(), body={}),
+            "Your API key is missing or invalid. Please run 'lucy login' in your terminal to set one.",
+        ),
+        (
+            ValueError("OpenAI API key not set."),
+            "Your API key is missing or invalid. Please run 'lucy login' in your terminal to set one.",
+        ),
+        (
+            RuntimeError("boom"),
+            "An unexpected error occurred. Please restart the app and try again.",
+        ),
     ],
-    ids=[
-        "model_not_found",
-        "insufficient_credits",
-        "connection_error",
-    ],
+    ids=["model_not_found", "insufficient_credits", "connection_error", "auth_error", "missing_key", "unexpected"],
 )
-def test_handle_request_renders_expected_errors(monkeypatch, exc, message):
-    monkeypatch.setattr(
-        app,
-        "run_agent",
-        lambda prompt: (_ for _ in ()).throw(exc),
-    )
+def test_handle_request_helper_renders_error_and_returns_none(monkeypatch, fake_ui, exc, message):
+    def failing_run_agent(prompt):
+        raise exc
+
+    monkeypatch.setattr(app, "run_agent", failing_run_agent)
+
+    assert app._handle_request("prompt") is None
+    assert fake_ui.errors_rendered == [message]
 
 
-def test_handle_request_renders_generic_error_and_logs(monkeypatch):
-    monkeypatch.setattr(app, "run_agent", lambda prompt: (_ for _ in ()).throw(RuntimeError("boom")))
-    errors = []
+def test_handle_request_helper_logs_unexpected_errors(monkeypatch, fake_ui):
     logged = []
-    monkeypatch.setattr(app.ui.responses, "render_error", lambda msg: errors.append(msg))
+    monkeypatch.setattr(app, "run_agent", Mock(side_effect=RuntimeError("boom")))
     monkeypatch.setattr(app.logger, "exception", lambda msg: logged.append(msg))
 
-    assert app.handle_request("prompt") is None
-    assert errors == ["An unexpected error occurred. Please restart the app and try again."]
+    app._handle_request("prompt")
+
     assert logged == ["Unhandled exception"]
 
 
-def test_run_app_happy_path(monkeypatch):
-    ctx = DummyContext(DummyRequest(prompt="first prompt"))
-    session_mgr = SessionManager()
-    responses = []
+# ---------- handle_request ----------
 
-    monkeypatch.setattr(app, "ui", ctx)
-    monkeypatch.setattr(app, "SessionManager", lambda: session_mgr)
-    monkeypatch.setattr(app, "handle_request", lambda prompt: SimpleNamespace(content="response", usage={"u": 1}, time=2.5))
-    monkeypatch.setattr(app, "CLEAR_TERMINAL_UPON_EXIT", False)
+def test_handle_request_records_turn_and_renders_answer(monkeypatch, fake_ui):
+    session = FakeSessionManager()
+    monkeypatch.setattr(app, "run_agent", lambda prompt: (fake_agent_result(text="hi there"), 2.0))
 
-    def render_response(content):
-        responses.append(content)
-        raise StopIteration
+    app.handle_request(session)
 
-    monkeypatch.setattr(ctx.responses, "render_response", render_response)
+    assert session.transcript == [("user", "hello"), ("agent", "hi there")]
+    assert session.request_scopes == 1
+    (model_id, usage), = session.metadata_updates
+    assert model_id == app.MODEL
+    assert usage.input_tokens == 1_000  # this turn's usage, not the agent's lifetime total
+    assert fake_ui.responses_rendered == ["hi there"]
+    assert len(fake_ui.rules) == 1
 
-    with pytest.raises(StopIteration):
+
+def test_handle_request_survives_failed_agent_call(monkeypatch, fake_ui):
+    session = FakeSessionManager()
+    monkeypatch.setattr(app, "run_agent", Mock(side_effect=app.RateLimitError("rate limit", response=Mock(), body={})))
+
+    app.handle_request(session)  # must not raise: the session should keep running
+
+    assert session.transcript == [("user", "hello")]
+    assert session.metadata_updates == []
+    assert fake_ui.responses_rendered == []
+    assert len(fake_ui.errors_rendered) == 1
+
+
+def test_handle_request_terminates_on_ctrl_c(monkeypatch):
+    ui = FakeUI(prompts=[KeyboardInterrupt()])
+    monkeypatch.setattr(app, "ui", ui)
+    session = FakeSessionManager()
+
+    with pytest.raises(KeyboardInterrupt):
+        app.handle_request(session)
+
+    assert ui.terminate_calls == [app.CLEAR_TERMINAL_UPON_EXIT]
+    assert session.transcript == []
+
+
+# ---------- run_app ----------
+
+def test_run_app_loops_until_interrupted_and_closes_session(monkeypatch, fake_ui):
+    session = FakeSessionManager()
+    monkeypatch.setattr(app, "SessionManager", lambda: session)
+    handle = Mock(side_effect=[None, None, KeyboardInterrupt()])
+    monkeypatch.setattr(app, "handle_request", handle)
+
+    with pytest.raises(KeyboardInterrupt):
         app.run_app()
 
-    assert ctx.initialise_called is True
-    assert ctx.banner_render_called is True
-    assert ctx.request.usage == {"u": 1}
-    assert ctx.request.time_elapsed == 2.5
-    assert ctx.request.print_called is True
-    assert responses == ["response"]
-    assert session_mgr.session_ctx.entered is True
-    assert session_mgr.session_ctx.exited is True
-    assert session_mgr.request_ctx.entered is True
-    assert session_mgr.request_ctx.exited is True
+    assert handle.call_count == 3
+    handle.assert_called_with(session)
+    assert fake_ui.initialise_called is True
+    assert fake_ui.banner_render_called is True
+    assert session.session_entered is True
+    assert session.session_exited is True

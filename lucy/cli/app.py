@@ -14,17 +14,10 @@ from strands.agent import AgentResult
 from lucy.agent.agent import run_agent
 from lucy.logger import get_logger
 from lucy.ui.core import ui
-from lucy.cli.utils import compute_usage_metrics, compute_accumulated_metrics
-from lucy.config import (
-    CLEAR_TERMINAL_UPON_EXIT, 
-    MODEL,
-    MODEL_CACHE_COST_PM, 
-    MODEL_CONTEXT_WINDOW, 
-    MODEL_INPUT_COST_PM, 
-    MODEL_OUTPUT_COST_PM,
-)
+from lucy.cli.utils import compute_usage_metrics
+from lucy.config import CLEAR_TERMINAL_UPON_EXIT, MODEL
 from lucy.session.manager import SessionManager
-from lucy.session.models import SessionMetadata, UsageMetrics
+from lucy.session.models import UsageMetrics
 
 logger = get_logger(__name__)
 
@@ -32,22 +25,19 @@ logger = get_logger(__name__)
 @dataclass
 class AgentResponse:
     content: str
-    current_usage: UsageMetrics
-    accumulated_usage: UsageMetrics
+    usage: UsageMetrics  # this turn only; session totals live in session metadata
     time: float
 
 
 
-def _handle_request(prompt: str) -> AgentResponse:
+def _handle_request(prompt: str) -> AgentResponse | None:
+    """Run one agent turn. Returns None after rendering an error."""
     try:
         response, time_elapsed = run_agent(prompt)
         answer = response.message["content"][-1].get("text")
-        current_usage_metrics = compute_usage_metrics(response)
-        accumulated_usage_metrics = compute_accumulated_metrics(response)
         return AgentResponse(
-            answer, 
-            current_usage_metrics,
-            accumulated_usage_metrics, 
+            answer,
+            compute_usage_metrics(response),
             time_elapsed
         )
     except NotFoundError:
@@ -83,6 +73,11 @@ def handle_request(session_manager: SessionManager):
     with session_manager.request_scope():
         response = _handle_request(prompt)
 
+        if response is None:
+            # The error has already been rendered; keep the session alive.
+            logger.warning("Agent request failed; no response to record")
+            return
+
         session_manager.append_transcript(
             role="agent",
             message=response.content
@@ -91,20 +86,14 @@ def handle_request(session_manager: SessionManager):
 
         session_manager.update_metadata(
             model_id=MODEL,
-            usage=response.accumulated_usage
+            usage=response.usage
         )
 
         logger.info("Metadata updated")
 
-        if response is None:
-            ui.responses.render_response("There was no response. Please try again.")
-            logger.warning("Agent returned empty response")
-            return
-        
         rule_title = ""
         try:
-            cu = response.current_usage
-            au = response.accumulated_usage
+            cu = response.usage
             rule_title = f"Input={cu.input_tokens} Output={cu.output_tokens} Time={response.time}s Context_used={cu.context_used_pct}% Cost=${cu.cost_usd}"
         except Exception:
             logger.exception("Failed to print metrics")

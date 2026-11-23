@@ -72,10 +72,10 @@ def run_agent(prompt: str):
     
     logger.info(
         "token_usage=%d/%d/%d/%d resp_time=%.2fs",
-        usage["inputTokens"],
-        usage["outputTokens"],
-        getattr(usage, "cacheReadInputTokens", 0),
-        getattr(usage, "cacheWriteInputTokens", 0),
+        usage.get("inputTokens", 0),
+        usage.get("outputTokens", 0),
+        usage.get("cacheReadInputTokens", 0),
+        usage.get("cacheWriteInputTokens", 0),
         elapsed,
     )
     return response, elapsed

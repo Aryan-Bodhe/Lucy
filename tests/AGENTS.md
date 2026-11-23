@@ -22,21 +22,13 @@ suite.
 - Config/logging can create files before fixtures run. On Linux, set a temporary
   `XDG_STATE_HOME` before starting pytest, as shown in the root guide.
 
-## Existing drift
+## Keeping the suite trustworthy
 
-Collection succeeding does not mean the suite matches current production APIs.
-Session fixtures still reference missing `ExecutionMetrics`, old metadata shapes,
-and old manager signatures; model tests also expect the old `lucy` role. CLI
-fixtures and tests include an older request/context lifecycle. Compare fixtures
-against source before deciding whether the implementation or expectation is wrong.
+The full suite was brought in line with current production APIs on 2026-11-23
+and passes without deselection. When a test fails, decide whether the test or
+the code reflects the intended behavior before changing either; a test that
+asserts current buggy behavior is worse than no test.
 
-In particular, `tests/cli/test_app.py::test_run_app_happy_path` replaces
-`handle_request` with a function that returns immediately, but the current
-`run_app` loop ignores that return value. The mocked render function that raises
-`StopIteration` may never be called, leaving the test looping indefinitely. Use
-a bounded test process until that test is updated for the current lifecycle.
-
-For a feature or fix, add focused tests for the intended behavior, run the
-affected subset, and report pre-existing failures separately. Do not bulk-rewrite
-stale suites or remove assertions as incidental cleanup. The documented setup
-baseline is in `docs/ARCHITECTURE.md`; it records collection failures, not passes.
+For a feature or fix, add focused tests for the intended behavior and confirm a
+regression test fails without the fix. Run the affected subset, then the full
+suite. Do not remove assertions to make a run pass.

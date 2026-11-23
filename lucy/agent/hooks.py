@@ -62,12 +62,13 @@ class ProgressHook(HookProvider):
                 tool_name,
                 tool_command
             )
-        
-        logger.info(
-            "Tool succeeded: %s %s",
-            tool_name,
-            tool_command
-        )
+        else:
+            logger.info(
+                "Tool succeeded: %s %s",
+                tool_name,
+                tool_command
+            )
+
         ui.tools.render_status(
             tool_name if tool_type == "tool" else tool_command,
             tool_command=tool_command,

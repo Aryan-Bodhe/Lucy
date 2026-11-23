@@ -13,10 +13,11 @@ class DummyAgent:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.calls = []
+        self.usage = None
 
     def __call__(self, prompt):
         self.calls.append(prompt)
-        return DummyResponse(message={"content": prompt})
+        return DummyResponse(message={"content": prompt}, usage=self.usage)
 
 
 class DummyOpenAIModel:

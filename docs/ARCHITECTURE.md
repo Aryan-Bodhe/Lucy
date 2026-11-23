@@ -67,31 +67,29 @@ model request. These paths should be tested with mocks.
 
 ## Known integration gaps to check when touching these areas
 
-These observations come from source inspection, not a successful runtime suite.
 Resolve them only when relevant to the requested change, and update this list
 when fixed.
 
 - Python support differs between package metadata (>=3.10), README (3.12+), and
   session imports (`datetime.UTC` needs 3.11+).
-- `cli.app.handle_request` dereferences the result before its `None` guard, even
-  though `_handle_request` can return `None` after rendering an error.
-- Usage interfaces need reconciliation: `compute_accumulated_metrics` supplies
-  `context_used`, while `UsageMetrics` defines `context_used_pct`, and the manager
-  adds the provided usage to saved totals even when supplied accumulated values.
-- `SAFE_TOOLS` has adjacent `"skills"` and `"current_time"` literals without a
-  comma. The active approval intervention uses `SENSITIVE_TOOLS`, not this list.
 - Session listing assumes entries are UUID directories with valid metadata; it
   scans a capped set before sorting, which need not contain the newest sessions.
-- Several tests use older APIs: metadata as a single usage object, an
-  `ExecutionMetrics` type no longer defined, a `lucy` transcript role, and
-  `handle_request(prompt)` rather than `handle_request(session_manager)`.
+- `UsageMetrics.cached_output_tokens` actually holds cache *write* (input)
+  tokens. Renaming it changes the saved metadata schema.
+- Ctrl+D at the prompt raises `EOFError`, which reaches `main`'s generic handler
+  instead of the clean shutdown path used for Ctrl+C.
+
+## Usage accounting
+
+`compute_usage_metrics` returns usage for one turn, taken from
+`metrics.latest_agent_invocation`. Strands' `metrics.accumulated_usage` spans
+every call on the cached agent and must not be saved: `SessionManager` adds each
+turn's usage into the per-model totals in `metadata.json`. OpenAI reports cached
+tokens inside `inputTokens`, so cost bills them once at the cache rate.
+`context_used_pct` is a percentage (0-100) of `MODEL_CONTEXT_WINDOW`.
 
 ## Inspection baseline
 
-During agent documentation setup on 2026-11-23, the existing ignored `env/`
-contained Python symlinks targeting a missing `/usr/bin/python3.12`. System
-Python was 3.14.4 with pytest 9.0.2. Running
-`XDG_STATE_HOME=/tmp/lucy-agent-onboarding-state python3 -m pytest --collect-only -q`
-stopped with eight collection errors for missing `keyring`, `pydantic`,
-`colorama`, and `openai`. No test pass/fail baseline was established. Recreate a
-working environment and collect again before attributing failures to a change.
+On 2026-11-23 the ignored `env/` used Python 3.14.4 with the editable package and
+pytest installed. With `XDG_STATE_HOME` set to a temporary directory, the full
+suite (`env/bin/python -m pytest -q`) passed: 111 tests.
