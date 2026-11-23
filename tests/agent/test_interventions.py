@@ -1,5 +1,3 @@
-import subprocess
-
 from lucy.agent import interventions
 
 
@@ -65,11 +63,28 @@ def test_has_sudo_access_detects_cached_credentials(monkeypatch):
     assert runs == [["sudo", "-n", "true"]]
 
 
+def _forbid_real_subprocess(monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("tests must not run real subprocesses such as sudo")
+
+    monkeypatch.setattr(interventions.subprocess, "run", fail)
+
+
 def test_gain_sudo_privileges_returns_false_when_password_missing(monkeypatch):
-    monkeypatch.setattr(interventions, "subprocess", subprocess)
+    # Pin "no cached credentials"; real sudo state differs between machines (CI runners have passwordless sudo).
+    _forbid_real_subprocess(monkeypatch)
+    monkeypatch.setattr(interventions.SudoPasswordHandler, "_has_sudo_access", lambda self: False)
 
     handler = interventions.SudoPasswordHandler()
     assert handler._gain_sudo_privileges(None) is False
+
+
+def test_gain_sudo_privileges_skips_password_when_credentials_cached(monkeypatch):
+    _forbid_real_subprocess(monkeypatch)
+    monkeypatch.setattr(interventions.SudoPasswordHandler, "_has_sudo_access", lambda self: True)
+
+    handler = interventions.SudoPasswordHandler()
+    assert handler._gain_sudo_privileges(None) is True
 
 
 def test_gain_sudo_privileges_uses_sudo_password(monkeypatch):

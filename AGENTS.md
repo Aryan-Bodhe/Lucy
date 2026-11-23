@@ -25,8 +25,7 @@ Do not assume the ignored `env/` works on a new machine.
 ```bash
 python3 --version
 python3 -m venv .venv
-.venv/bin/python -m pip install -e .
-.venv/bin/python -m pip install pytest
+.venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/python -m pytest --collect-only -q
 .venv/bin/python -m pytest -q tests/agent
 .venv/bin/python -m pytest -q
@@ -42,8 +41,11 @@ These paths are for POSIX shells; Windows uses `.venv\Scripts\python.exe` and
 - `makefile` uses `env/bin/`, not `.venv/bin/`. `make dev` installs packaging tools
   and the editable package, but does not install pytest, Black, or Ruff.
 - `make test`, `make fmt`, and `make lint` require their tools to be installed in
-  `env/`. There is no checked-in formatter/linter configuration or CI workflow.
-  Avoid broad formatting as an incidental change.
+  `env/`. There is no checked-in formatter/linter configuration. Avoid broad
+  formatting as an incidental change.
+- CI (`.github/workflows/tests.yml`) installs `.[dev]` and runs the full pytest
+  suite on Python 3.12-3.14 for pushes to `main` and every pull request. Add new
+  test-only dependencies to the `dev` extra so CI and local setups match.
 - Build checks, when packaging is affected: install `build` and `twine` in the
   chosen environment, then run `python -m build` and `python -m twine check dist/*`
   with that environment's interpreter. Review package-data rules when changing

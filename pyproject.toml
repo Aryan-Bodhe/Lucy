@@ -22,6 +22,11 @@ dependencies = [
     "pydantic~=2.13",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest~=9.0",
+]
+
 [project.scripts]
 lucy = "lucy.main:main"
 
