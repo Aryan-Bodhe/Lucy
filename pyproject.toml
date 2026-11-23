@@ -19,6 +19,7 @@ dependencies = [
     "rich~=14.3",
     "prompt-toolkit~=3.0",
     "platformdirs~=4.10",
+    "pydantic~=2.13",
 ]
 
 [project.scripts]

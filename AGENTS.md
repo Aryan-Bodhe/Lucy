@@ -56,12 +56,12 @@ These paths are for POSIX shells; Windows uses `.venv\Scripts\python.exe` and
 | Concern | Primary files | Related tests |
 | --- | --- | --- |
 | CLI arguments and routing | `lucy/main.py`, `lucy/cli/dispatcher.py` | `tests/test_main.py`, `tests/cli/test_dispatcher.py` |
-| Interactive request loop and usage | `lucy/cli/app.py`, `lucy/cli/utils.py` | `tests/cli/test_app.py` (partly stale) |
+| Interactive request loop and usage | `lucy/cli/app.py`, `lucy/cli/utils.py` | `tests/cli/test_app.py`, `tests/cli/test_utils.py` |
 | Agent/model lifecycle | `lucy/agent/agent.py` | `tests/agent/test_agent.py` |
 | Tool registration, progress, consent | `lucy/agent/tools.py`, `hooks.py`, `interventions.py`, `utils.py` | `tests/agent/`, `tests/ui/test_approvals.py` |
 | Prompt and packaged skills | `lucy/agent/prompts/system_prompt.py`, `lucy/agent/skills/` | Agent tests; inspect built package when changing assets |
 | Credentials and diagnostics | `lucy/cli/auth.py`, `doctor.py`, `lucy/ui/auth.py`, `doctor.py` | `tests/cli/`, `tests/ui/` |
-| Session persistence and IDs | `lucy/session/` | `tests/session/` (partly stale) |
+| Session persistence and IDs | `lucy/session/` | `tests/session/` |
 | Terminal presentation/input | `lucy/ui/` | `tests/ui/` |
 | Settings and logging | `lucy/config.py`, `lucy/logger.py` | Check callers and affected subsystem tests |
 
@@ -107,9 +107,9 @@ Paths abbreviated within a cell are relative to the first named directory.
 - Unit tests should mock model calls, credentials, subprocesses, and interactive
   input. Do not use live `lucy`, `login`, `logout`, or `doctor` as routine tests:
   they can prompt, change credentials, contact the network, or incur model usage.
-- Start with affected tests and collection. Some existing tests have obsolete
-  mocks, including a CLI loop test that can fail to terminate. Consult the test
-  guide before a full run; use a bounded test process where appropriate.
+- Start with affected tests and collection, then run the full suite. Consult the
+  test guide before changing tests; use a bounded test process when touching the
+  interactive loop.
 - Report commands run and distinguish environment/collection failures, existing
   source-test drift, and regressions. Do not claim tests passed when collection
   failed, or weaken tests solely to hide failures.
