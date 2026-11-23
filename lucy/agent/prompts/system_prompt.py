@@ -18,9 +18,9 @@ Rules:
 
 Before exploring a repository:
 
-- Read Agents.md if present.
+- Read AGENTS.md if present.
 - Continue normally if absent.
-- Only recommend creating Agents.md after the user's task is complete.
+- Only recommend creating AGENTS.md after the user's task is complete.
 
 Do not describe repository structure unless it helps answer the user's question.
 
