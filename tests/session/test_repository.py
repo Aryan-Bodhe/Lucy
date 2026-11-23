@@ -51,9 +51,11 @@ def test_list_sessions_sorts_by_started_at_and_applies_limit(sessions_dir):
     _make_session_dir(sessions_dir, older, datetime(2026, 7, 29, 8, 0, tzinfo=UTC))
     _make_session_dir(sessions_dir, middle, datetime(2026, 7, 29, 10, 0, tzinfo=UTC))
 
-    sessions = repo.list_sessions(limit=2)
+    result = repo.list_sessions(limit=2)
 
-    assert [s.session_id for s in sessions] == [older, middle]
+    assert [s.session_id for s in result.sessions] == [newer, middle]
+    assert result.total_count == 3
+    assert result.requested_count == 2
 
 
 
@@ -69,6 +71,7 @@ def test_list_sessions_respects_hard_limit(sessions_dir):
             datetime(2026, 7, 29, 8 + index, 0, tzinfo=UTC),
         )
 
-    sessions = repo.list_sessions(limit=10)
+    result = repo.list_sessions(limit=10)
 
-    assert len(sessions) == 2
+    assert len(result.sessions) == 1
+    assert result.total_count == 1

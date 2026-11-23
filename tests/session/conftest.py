@@ -34,19 +34,16 @@ def sample_metadata(fixed_timestamp):
     return session_models.SessionMetadata(
         started_at=fixed_timestamp,
         ended_at=fixed_timestamp,
-        usage=session_models.UsageMetrics(
-            input_tokens=12,
-            output_tokens=34,
-            cached_input_tokens=5,
-            cached_output_tokens=6,
-            cost_usd=0.42,
-        ),
-        execution=session_models.ExecutionMetrics(
-            model_calls=3,
-            tool_calls=4,
-            turns=5,
-            models_used={"gpt-5.4-mini", "o3"},
-        ),
+        usage={
+            "gpt-5.4-mini": session_models.UsageMetrics(
+                input_tokens=12,
+                output_tokens=34,
+                cached_input_tokens=5,
+                cached_output_tokens=6,
+                context_used_pct=1.5,
+                cost_usd=0.42,
+            ),
+        },
     )
 
 

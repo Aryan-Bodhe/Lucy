@@ -25,10 +25,10 @@ def test_usage_metrics_defaults():
 def test_transcript_event_accepts_valid_role():
     event = TranscriptEvent(
         timestamp=datetime(2026, 7, 29, 11, 36, tzinfo=UTC),
-        role="lucy",
+        role="agent",
         message="done",
     )
-    assert event.role == "lucy"
+    assert event.role == "agent"
 
 
 def test_transcript_event_rejects_invalid_role():
@@ -40,11 +40,40 @@ def test_transcript_event_rejects_invalid_role():
         )
 
 
+def test_transcript_event_defaults_timestamp_to_now_utc():
+    before = datetime.now(UTC)
+    event = TranscriptEvent(role="user", message="hi")
+    assert before <= event.timestamp <= datetime.now(UTC)
+
+
 def test_session_metadata_defaults():
-    metadata = SessionMetadata()
+    metadata = SessionMetadata(started_at=datetime(2026, 7, 29, 11, 36, tzinfo=UTC))
     assert metadata.ended_at is None
-    assert isinstance(metadata.started_at, datetime)
-    assert metadata.usage == UsageMetrics()
+    assert metadata.usage == {}
+
+
+def test_session_metadata_requires_started_at():
+    with pytest.raises(ValidationError):
+        SessionMetadata()
+
+
+def test_usage_metrics_addition_sums_counts_and_keeps_peak_context():
+    a = UsageMetrics(input_tokens=10, output_tokens=2, total_tokens=12, context_used_pct=3.0, cost_usd=0.5)
+    b = UsageMetrics(input_tokens=5, output_tokens=1, total_tokens=6, context_used_pct=1.0, cost_usd=0.25)
+
+    total = a + b
+
+    assert (total.input_tokens, total.output_tokens, total.total_tokens) == (15, 3, 18)
+    assert total.context_used_pct == 3.0
+    assert total.cost_usd == 0.75
+
+
+def test_session_metadata_json_round_trip():
+    metadata = SessionMetadata(
+        started_at=datetime(2026, 7, 29, 11, 36, tzinfo=UTC),
+        usage={"gpt-test": UsageMetrics(input_tokens=3, cost_usd=0.1)},
+    )
+    assert SessionMetadata.model_validate_json(metadata.model_dump_json()) == metadata
 
 
 def test_session_metadata_forbids_extra_fields():
@@ -63,7 +92,7 @@ def test_session_transcript_wraps_events():
 
 
 def test_session_data_and_summary_round_trip(session_id):
-    metadata = SessionMetadata()
+    metadata = SessionMetadata(started_at=datetime(2026, 7, 29, 11, 36, tzinfo=UTC))
     event = TranscriptEvent(
         timestamp=datetime(2026, 7, 29, 11, 36, tzinfo=UTC),
         role="user",

@@ -1,16 +1,15 @@
-from contextlib import contextmanager
 from datetime import UTC, datetime
-from uuid import uuid4
 
 import pytest
 
-from lucy.session.models import SessionMetadata, TranscriptEvent
+from lucy.session.models import SessionMetadata, UsageMetrics
 
 
 class DummyStore:
     def __init__(self):
         self.appended = []
         self.metadata_updates = []
+        self.closed = False
         self._metadata = SessionMetadata(started_at=datetime(2026, 7, 29, 11, 0, tzinfo=UTC))
         self._transcript = []
 
@@ -23,7 +22,7 @@ class DummyStore:
         self._metadata = metadata
 
     def read_metadata(self):
-        return self._metadata
+        return self._metadata.model_copy(deep=True)
 
     def read_transcript_data(self):
         return self._transcript
@@ -31,130 +30,96 @@ class DummyStore:
     def read_session_data(self):
         return {"metadata": self._metadata, "transcript": self._transcript}
 
+    def close(self):
+        self.closed = True
+
 
 class DummyRepo:
     def __init__(self):
-        self.created = []
+        self.opened = []
         self.sessions = []
 
     def open_session(self, session_id):
-        store = DummyStore()
-        self.created.append(session_id)
-        return store
-
+        self.opened.append(session_id)
+        return DummyStore()
 
     def list_sessions(self, limit=5):
         return self.sessions[:limit]
 
 
-def _patch_manager(monkeypatch):
+@pytest.fixture()
+def manager(monkeypatch):
     from lucy.session import manager as manager_module
 
     monkeypatch.setattr(manager_module, "SessionRepository", DummyRepo)
-    return manager_module
+    return manager_module.SessionManager()
 
 
-def test_request_scope_sets_and_resets_request_id(monkeypatch):
-    manager_module = _patch_manager(monkeypatch)
-    manager = manager_module.SessionManager()
-
+def test_request_scope_sets_and_resets_request_id(manager):
     assert manager.request_id is None
     with manager.request_scope():
         assert manager.request_id is not None
     assert manager.request_id is None
 
 
-def test_session_scope_sets_and_resets_session_id(monkeypatch):
-    manager_module = _patch_manager(monkeypatch)
-    manager = manager_module.SessionManager()
-
+def test_session_scope_opens_and_closes_store(manager):
     assert manager.session_id is None
     with manager.session_scope():
+        store = manager._store
         assert manager.session_id is not None
-        assert manager._store is not None
+        assert manager._repository.opened == [manager.session_id]
+    assert store.closed is True
     assert manager.session_id is None
     assert manager._store is None
 
 
-def test_append_transcript_requires_active_session(monkeypatch):
-    manager_module = _patch_manager(monkeypatch)
-    manager = manager_module.SessionManager()
-
+def test_session_scope_closes_store_when_body_raises(manager):
     with pytest.raises(RuntimeError):
-        manager.append_transcript(
-            TranscriptEvent(
-                timestamp=datetime(2026, 7, 29, 11, 0, tzinfo=UTC),
-                role="user",
-                message="hi",
-            )
-        )
+        with manager.session_scope():
+            store = manager._store
+            raise RuntimeError("boom")
+    assert store.closed is True
+    assert manager.session_id is None
 
 
-def test_append_transcript_and_metadata_delegate_to_store(monkeypatch):
-    manager_module = _patch_manager(monkeypatch)
-    manager = manager_module.SessionManager()
+def test_append_transcript_requires_active_session(manager):
+    with pytest.raises(RuntimeError):
+        manager.append_transcript(role="user", message="hi")
 
-    event = TranscriptEvent(
-        timestamp=datetime(2026, 7, 29, 11, 0, tzinfo=UTC),
-        role="user",
-        message="hi",
-    )
-    metadata = SessionMetadata(started_at=datetime(2026, 7, 29, 11, 0, tzinfo=UTC))
+
+def test_append_transcript_builds_event_for_store(manager):
+    with manager.session_scope():
+        manager.append_transcript(role="user", message="hi")
+        (event,) = manager._store.appended
+
+    assert event.role == "user"
+    assert event.message == "hi"
+
+
+def test_update_metadata_sums_per_turn_usage_per_model(manager):
+    turn = UsageMetrics(input_tokens=10, output_tokens=2, total_tokens=12, cost_usd=0.5)
 
     with manager.session_scope():
-        manager.append_transcript(event)
-        manager.update_metadata(metadata)
+        manager.update_metadata(model_id="gpt-test", usage=turn)
+        manager.update_metadata(model_id="gpt-test", usage=turn)
+        manager.update_metadata(model_id="other", usage=turn)
+        usage = manager.get_metadata().usage
 
-        assert manager._store.appended == [event]
-        assert manager._store.metadata_updates == [metadata]
+    assert usage["gpt-test"].input_tokens == 20
+    assert usage["gpt-test"].cost_usd == 1.0
+    assert usage["other"].input_tokens == 10
 
 
-def test_read_methods_delegate_to_store(monkeypatch):
-    manager_module = _patch_manager(monkeypatch)
-    manager = manager_module.SessionManager()
-
-    event = TranscriptEvent(
-        timestamp=datetime(2026, 7, 29, 11, 0, tzinfo=UTC),
-        role="user",
-        message="hi",
-    )
-
+def test_read_methods_delegate_to_store(manager):
     with manager.session_scope():
-        manager.append_transcript(event)
-        assert manager.get_transcript() == [event]
+        manager.append_transcript(role="user", message="hi")
+        (event,) = manager.get_transcript()
+        assert event.message == "hi"
         assert manager.get_metadata().started_at == datetime(2026, 7, 29, 11, 0, tzinfo=UTC)
         assert manager.session()["transcript"] == [event]
 
 
-
-def test_list_sessions_delegates_to_repository(monkeypatch):
-    manager_module = _patch_manager(monkeypatch)
-    manager = manager_module.SessionManager()
-
-    expected = [1, 2, 3]
-    manager._repository.sessions = expected
+def test_list_sessions_delegates_to_repository(manager):
+    manager._repository.sessions = [1, 2, 3]
 
     assert manager.list_sessions(limit=2) == [1, 2]
-
-
-def test_session_scope_uses_repository_open_session_or_legacy_method(monkeypatch):
-    from lucy.session import manager as manager_module
-
-    class RepoWithOnlyOpenSession:
-        def __init__(self):
-            self.called = False
-
-        def open_session(self, session_id):
-            self.called = True
-            return DummyStore()
-
-        def list_sessions(self, limit=5):
-            return []
-
-    monkeypatch.setattr(manager_module, "SessionRepository", RepoWithOnlyOpenSession)
-    manager = manager_module.SessionManager()
-
-    # This documents the intended contract: if you keep the current code calling
-    # get_or_create_session, this test will fail until the manager is aligned.
-    with manager.session_scope():
-        assert manager._store is not None

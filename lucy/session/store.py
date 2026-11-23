@@ -25,12 +25,6 @@ class SessionStore:
         )
 
         self.transcript_file.touch(exist_ok=True)
-        self.append_transcript(
-            TranscriptEvent(
-                role="agent", 
-                message="Transcription started."
-            )
-        )
         logger.info("[store.py] Store init successful.")
         return self
 
