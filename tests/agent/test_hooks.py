@@ -93,12 +93,14 @@ def test_after_tool_failure_due_to_result_error(monkeypatch):
     rendered = []
     monkeypatch.setattr(hooks, "parse_tool_parameters", lambda name, input_data: "parsed-cmd")
     monkeypatch.setattr(hooks.logger, "warning", lambda msg, *args: warnings.append(msg % args if args else msg))
-    monkeypatch.setattr(hooks.logger, "info", lambda *args, **kwargs: None)
+    infos = []
+    monkeypatch.setattr(hooks.logger, "info", lambda msg, *args: infos.append(msg % args if args else msg))
     monkeypatch.setattr(hooks.ui.tools, "render_status", lambda *args, **kwargs: rendered.append((args, kwargs)))
 
     hooks.ProgressHook().after_tool(DummyEvent("editor", {"command": "view"}, result={"status": "error"}))
 
     assert warnings == ["Tool failed: editor parsed-cmd"]
+    assert infos == []
     assert rendered[0][1]["status"] == "failed"
 
 
@@ -111,6 +113,5 @@ def test_after_tool_refused(monkeypatch):
 
     hooks.ProgressHook().after_tool(DummyEvent("editor", {"command": "view"}, cancel_message="nope"))
 
-    assert infos[0] == "User refused tool: editor parsed-cmd"
-    assert infos[-1] == "Tool succeeded: editor parsed-cmd"
+    assert infos == ["User refused tool: editor parsed-cmd"]
     assert rendered[0][1]["status"] == "refused"

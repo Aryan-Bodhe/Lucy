@@ -17,7 +17,7 @@ SENSITIVE_TOOLS = [
 ]
 
 SAFE_TOOLS = [
-    "skills"
+    "skills",
     "current_time",
     "handoff_to_user"
 ]

@@ -64,9 +64,21 @@ def test_run_agent_appends_metadata_and_returns_message(monkeypatch):
     logs = []
     monkeypatch.setattr(agent.logger, "info", lambda msg, *args: logs.append(msg % args if args else msg))
 
-    message, elapsed = agent.run_agent("hello")
+    response, elapsed = agent.run_agent("hello")
 
     assert fake_agent.calls == ["hello [meta]"]
-    assert message == {"content": "hello [meta]"}
+    assert response.message == {"content": "hello [meta]"}
     assert elapsed == 1.25
     assert any("token_usage=1/2/0/0 resp_time=1.25s" in entry for entry in logs)
+
+
+def test_run_agent_logs_cache_tokens(monkeypatch):
+    fake_agent = DummyAgent()
+    fake_agent.usage = {"inputTokens": 1, "outputTokens": 2, "cacheReadInputTokens": 3, "cacheWriteInputTokens": 4}
+    monkeypatch.setattr(agent, "_agent", fake_agent)
+    logs = []
+    monkeypatch.setattr(agent.logger, "info", lambda msg, *args: logs.append(msg % args if args else msg))
+
+    agent.run_agent("hello")
+
+    assert any("token_usage=1/2/3/4" in entry for entry in logs)
