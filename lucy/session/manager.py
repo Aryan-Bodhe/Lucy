@@ -77,6 +77,16 @@ class SessionManager:
         self._require_store()
         return self._store.read_metadata()
 
+    def is_session_titled(self) -> bool:
+        self._require_store()
+        return self._store.is_titled()
+
+    def set_session_title(self, session_title: str) -> None:
+        self._require_store()
+        metadata = self.get_metadata()
+        metadata.session_title = session_title
+        self._store.update_metadata(metadata)
+
     # ---------- Session ----------
 
     def session(self) -> SessionData:

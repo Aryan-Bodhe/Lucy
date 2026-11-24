@@ -27,6 +27,9 @@ class DummyStore:
     def read_transcript_data(self):
         return self._transcript
 
+    def is_titled(self):
+        return self._metadata.session_title is not None
+
     def read_session_data(self):
         return {"metadata": self._metadata, "transcript": self._transcript}
 
@@ -123,3 +126,26 @@ def test_list_sessions_delegates_to_repository(manager):
     manager._repository.sessions = [1, 2, 3]
 
     assert manager.list_sessions(limit=2) == [1, 2]
+
+
+def test_set_session_title_persists_without_dropping_usage(manager):
+    turn = UsageMetrics(input_tokens=10, cost_usd=0.5)
+
+    with manager.session_scope():
+        manager.update_metadata(model_id="gpt-test", usage=turn)
+        assert manager.is_session_titled() is False
+
+        manager.set_session_title("Fix Login Bug")
+
+        assert manager.is_session_titled() is True
+        metadata = manager.get_metadata()
+
+    assert metadata.session_title == "Fix Login Bug"
+    assert metadata.usage["gpt-test"].input_tokens == 10
+
+
+def test_title_methods_require_active_session(manager):
+    with pytest.raises(RuntimeError):
+        manager.is_session_titled()
+    with pytest.raises(RuntimeError):
+        manager.set_session_title("x")

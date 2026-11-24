@@ -48,6 +48,15 @@ class FakeSessionManager:
         self.session_entered = False
         self.session_exited = False
         self.request_scopes = 0
+        self.title = None
+        self.title_updates = []
+
+    def is_session_titled(self):
+        return self.title is not None
+
+    def set_session_title(self, title):
+        self.title = title
+        self.title_updates.append(title)
 
     def append_transcript(self, role, message):
         self.transcript.append((role, message))

@@ -12,8 +12,11 @@ changing behavior; limitations below describe the current checkout, not a roadma
    soon but currently also falls through to the app.
 3. `run_app` creates a `SessionManager`, enters `session_scope`, initializes the
    UI, shows the banner, and repeatedly calls `handle_request`.
-4. `handle_request` reads the prompt, saves a user transcript event, enters a
-   request scope, and calls `_handle_request`. That helper calls `run_agent`,
+4. `handle_request` reads the prompt and saves a user transcript event. If the
+   session has no title and the prompt is not blank, it calls `generate_title`
+   (a fresh, tool-less agent separate from the cached one; returns None on any
+   error) and falls back to the prompt's first line. It then enters a request
+   scope and calls `_handle_request`. That helper calls `run_agent`,
    extracts the response, and calculates current/accumulated usage.
 5. `run_agent` lazily constructs and reuses a Strands `Agent` with an `OpenAIModel`.
    It obtains credentials from keyring, appends working-directory/date/timezone
@@ -50,7 +53,9 @@ Config creates it and its `sessions/` child at import time. History lives in
 Each `sessions/<uuid>/` contains:
 
 - `metadata.json`: `SessionMetadata` with required `started_at`, optional
-  `ended_at`, and `usage`, a dictionary keyed by model ID.
+  `session_title` (None for untitled and pre-title sessions), optional
+  `ended_at`, and `usage`, a dictionary keyed by model ID. Title-generation
+  token usage is not recorded.
 - `transcript.jsonl`: one serialized `TranscriptEvent` per line with timestamp,
   role (`user` or `agent`), and message. Initialization adds an agent event.
 

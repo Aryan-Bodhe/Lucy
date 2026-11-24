@@ -85,3 +85,31 @@ def test_read_metadata_on_missing_file_raises(tmp_path, monkeypatch, session_id)
     store = SessionStore(session_id)
     with pytest.raises(FileNotFoundError):
         store.read_metadata()
+
+
+def test_new_store_starts_untitled_and_title_round_trips(sessions_dir, session_id):
+    from lucy.session.store import SessionStore
+
+    store = SessionStore(session_id).initialise()
+    assert store.is_titled() is False
+
+    metadata = store.read_metadata()
+    metadata.session_title = "Fix Login Bug"
+    store.update_metadata(metadata)
+
+    assert store.is_titled() is True
+    assert SessionStore(session_id).read_metadata().session_title == "Fix Login Bug"
+
+
+def test_metadata_saved_before_titles_existed_still_loads(sessions_dir, session_id):
+    from lucy.session.store import SessionStore
+
+    store = SessionStore(session_id)
+    store.path.mkdir(parents=True)
+    store.metadata_file.write_text(
+        '{"started_at": "2026-07-29T11:36:00Z", "ended_at": null, "usage": {}}',
+        encoding="utf-8",
+    )
+
+    assert store.read_metadata().session_title is None
+    assert store.is_titled() is False

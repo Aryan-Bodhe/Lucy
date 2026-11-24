@@ -10,6 +10,7 @@ from lucy.agent.hooks import ProgressHook
 from lucy.agent.tools import ALL_TOOLS
 from lucy.agent.interventions import SensitiveToolApproval
 from lucy.agent.prompts.system_prompt import PROMPT
+from lucy.agent.prompts.title_generation_prompt import PROMPT as TITLE_PROMPT
 from lucy.agent.utils import get_prompt_metadata
 
 from lucy.logger import get_logger
@@ -18,6 +19,7 @@ from lucy.config import MODEL, SKILLS_DIR, APP_NAME, MODEL_PROVIDER
 logger = get_logger(__name__)
 
 _agent = None
+TITLE_MAX_LENGTH = 60
 _tools = ALL_TOOLS
 _skills = AgentSkills(skills=SKILLS_DIR)
 
@@ -56,6 +58,37 @@ def _get_or_create_agent():
 
     logger.info("Created Agent instance successfully.")
     return _agent
+
+def generate_title(prompt: str, max_length: int = TITLE_MAX_LENGTH) -> str | None:
+    """Ask a fresh, tool-less agent for a short session title.
+
+    Never touches the cached coding agent, so the request does not enter its
+    conversation history. Returns None on any failure; a title is never worth
+    failing a turn over. Title usage is intentionally not added to session cost.
+    """
+    try:
+        title_agent = Agent(
+            model=_init_model(),
+            system_prompt=TITLE_PROMPT,
+            callback_handler=None,
+        )
+        response = title_agent(prompt)
+        text = response.message["content"][-1].get("text")
+    except Exception:
+        logger.exception("Title generation failed")
+        return None
+    return clean_title(text, max_length)
+
+
+def clean_title(text: str | None, max_length: int = TITLE_MAX_LENGTH) -> str | None:
+    """First non-empty line, stripped of whitespace and quotes, length-capped."""
+    if not text:
+        return None
+    lines = [line.strip().strip("\"'`").strip() for line in text.splitlines()]
+    first = next((line for line in lines if line), None)
+    if not first:
+        return None
+    return first[:max_length].rstrip()
 
 
 def run_agent(prompt: str):
