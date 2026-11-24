@@ -38,6 +38,7 @@ class SessionTranscript(BaseModel):
 
 class SessionMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    session_title: str | None = None  # absent in sessions saved before titles existed
     started_at: datetime
     ended_at: datetime | None = None
     usage: dict[str, UsageMetrics] = Field(default_factory=dict)

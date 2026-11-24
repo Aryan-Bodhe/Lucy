@@ -28,6 +28,9 @@ class SessionStore:
         logger.info("[store.py] Store init successful.")
         return self
 
+    def is_titled(self) -> bool:
+        return self.read_metadata().session_title is not None
+
 
     def update_metadata(self, new_metadata: SessionMetadata):
         data = new_metadata.model_dump_json(indent=2)

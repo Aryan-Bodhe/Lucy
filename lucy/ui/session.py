@@ -1,4 +1,5 @@
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Prompt
 
@@ -48,7 +49,7 @@ class SessionUI:
 
             self.console.print(
                 f"[bold]{idx:>2}.[/] "
-                f"{session.session_id} "
+                f"{escape(session.metadata.session_title or 'Untitled')} [dim]{str(session.session_id)[:8]}[/dim] "
                 f"[dim]({s_time} {HDOT} ${usage_cost: .4f})[/dim]"
             )
 

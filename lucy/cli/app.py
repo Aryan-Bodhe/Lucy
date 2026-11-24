@@ -11,7 +11,7 @@ from openai import (
 )
 from strands.agent import AgentResult
 
-from lucy.agent.agent import run_agent
+from lucy.agent.agent import run_agent, generate_title, clean_title
 from lucy.logger import get_logger
 from lucy.ui.core import ui
 from lucy.cli.utils import compute_usage_metrics
@@ -69,6 +69,11 @@ def handle_request(session_manager: SessionManager):
     )
     ui.print()
     logger.info("User prompt transcribed")
+
+    if prompt.strip() and not session_manager.is_session_titled():
+        title = generate_title(prompt) or clean_title(prompt)
+        if title:
+            session_manager.set_session_title(title)
 
     with session_manager.request_scope():
         response = _handle_request(prompt)

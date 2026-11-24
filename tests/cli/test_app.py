@@ -13,6 +13,19 @@ def fake_ui(monkeypatch):
     return ui
 
 
+@pytest.fixture(autouse=True)
+def fake_generate_title(monkeypatch):
+    """Keep handle_request tests off the real title model."""
+    calls = []
+
+    def generate_title(prompt):
+        calls.append(prompt)
+        return "Generated Title"
+
+    monkeypatch.setattr(app, "generate_title", generate_title)
+    return calls
+
+
 # ---------- _handle_request ----------
 
 def test_handle_request_helper_returns_answer_usage_and_time(monkeypatch, fake_ui):
@@ -121,6 +134,55 @@ def test_handle_request_terminates_on_ctrl_c(monkeypatch):
 
     assert ui.terminate_calls == [app.CLEAR_TERMINAL_UPON_EXIT]
     assert session.transcript == []
+
+
+# ---------- session titles ----------
+
+def test_handle_request_titles_untitled_session_from_first_prompt(monkeypatch, fake_ui, fake_generate_title):
+    session = FakeSessionManager()
+    monkeypatch.setattr(app, "run_agent", lambda prompt: (fake_agent_result(text="hi"), 1.0))
+
+    app.handle_request(session)
+
+    assert fake_generate_title == ["hello"]
+    assert session.title_updates == ["Generated Title"]
+
+
+def test_handle_request_does_not_retitle_titled_session(monkeypatch, fake_ui, fake_generate_title):
+    session = FakeSessionManager()
+    session.title = "Existing"
+    monkeypatch.setattr(app, "run_agent", lambda prompt: (fake_agent_result(text="hi"), 1.0))
+
+    app.handle_request(session)
+
+    assert fake_generate_title == []
+    assert session.title_updates == []
+
+
+def test_handle_request_falls_back_to_prompt_when_title_generation_fails(monkeypatch):
+    ui = FakeUI(prompts=["  Fix the login bug\nand add tests"])
+    monkeypatch.setattr(app, "ui", ui)
+    monkeypatch.setattr(app, "generate_title", lambda prompt: None)
+    monkeypatch.setattr(app, "run_agent", lambda prompt: (fake_agent_result(text="ok"), 1.0))
+    session = FakeSessionManager()
+
+    app.handle_request(session)
+
+    assert session.title_updates == ["Fix the login bug"]
+    assert ui.responses_rendered == ["ok"]  # the turn still completes
+
+
+@pytest.mark.parametrize("prompt", ["", "   ", "\n\n"])
+def test_handle_request_skips_title_for_blank_prompt(monkeypatch, fake_generate_title, prompt):
+    ui = FakeUI(prompts=[prompt])
+    monkeypatch.setattr(app, "ui", ui)
+    monkeypatch.setattr(app, "run_agent", lambda prompt: (fake_agent_result(text="ok"), 1.0))
+    session = FakeSessionManager()
+
+    app.handle_request(session)  # must not raise
+
+    assert fake_generate_title == []
+    assert session.title_updates == []
 
 
 # ---------- run_app ----------

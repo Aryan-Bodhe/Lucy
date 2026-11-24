@@ -2,7 +2,7 @@ import pytest
 
 from lucy.agent import agent
 
-from ._helpers import DummyAgent, DummyOpenAIModel, DummyRetryStrategy
+from ._helpers import DummyAgent, DummyOpenAIModel, DummyResponse, DummyRetryStrategy
 
 
 def test_init_model_returns_openai_model_when_key_exists(monkeypatch):
@@ -82,3 +82,69 @@ def test_run_agent_logs_cache_tokens(monkeypatch):
     agent.run_agent("hello")
 
     assert any("token_usage=1/2/3/4" in entry for entry in logs)
+
+
+# ---------- session titles ----------
+
+def test_generate_title_uses_fresh_toolless_agent_and_cleans_output(monkeypatch):
+    monkeypatch.setattr(agent.keyring, "get_password", lambda app_name, provider: "sk-test")
+    created = []
+
+    class TitleAgent(DummyAgent):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            created.append(self)
+
+        def __call__(self, prompt):
+            self.calls.append(prompt)
+            return DummyResponse(message={"content": [{"text": '  "Fix Login Bug"\nextra line'}]})
+
+    monkeypatch.setattr(agent, "Agent", TitleAgent)
+
+    title = agent.generate_title("please fix the login bug")
+
+    assert title == "Fix Login Bug"
+    (title_agent,) = created
+    assert title_agent.calls == ["please fix the login bug"]  # no prompt metadata appended
+    assert title_agent.kwargs["system_prompt"] == agent.TITLE_PROMPT
+    assert title_agent.kwargs["callback_handler"] is None
+    assert "tools" not in title_agent.kwargs
+    assert agent._agent is None  # the cached coding agent is untouched
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["missing_key", "model_error", "no_text"],
+)
+def test_generate_title_returns_none_on_failure(monkeypatch, failure):
+    if failure == "missing_key":
+        monkeypatch.setattr(agent.keyring, "get_password", lambda app_name, provider: None)
+    else:
+        monkeypatch.setattr(agent.keyring, "get_password", lambda app_name, provider: "sk-test")
+
+        class FailingAgent(DummyAgent):
+            def __call__(self, prompt):
+                if failure == "model_error":
+                    raise RuntimeError("boom")
+                return DummyResponse(message={"content": [{"toolUse": {}}]})
+
+        monkeypatch.setattr(agent, "Agent", FailingAgent)
+    monkeypatch.setattr(agent.logger, "exception", lambda msg: None)
+    monkeypatch.setattr(agent.logger, "error", lambda msg: None)
+
+    assert agent.generate_title("hello") is None
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        (None, None),
+        ("", None),
+        ("  \n \n", None),
+        ("\n  'Quoted Title'  \nsecond", "Quoted Title"),
+        ("`Code Title`", "Code Title"),
+        ("x" * 100, "x" * 60),
+    ],
+)
+def test_clean_title(text, expected):
+    assert agent.clean_title(text) == expected
